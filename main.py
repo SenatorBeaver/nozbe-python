@@ -1,7 +1,7 @@
 import nozbe
+import json
 
-
-username = input("Username:")
-password = input("Pass:")
+with open('credentials.json') as fp:
+    credentials = json.load(fp)
 n = nozbe.Nozbe()
-n.login(username, password)
+n.login(**credentials)
