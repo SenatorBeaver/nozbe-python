@@ -1,7 +1,10 @@
 #
 # -*- coding: utf-8 -*-
+import json
 import logging
 import os
+from datetime import datetime
+from pprint import pprint
 
 import requests
 import urllib.parse as urlparse
@@ -13,6 +16,22 @@ log = logging.getLogger("nozbe")
 class Nozbe(object):
     API_URL = 'https://api.nozbe.com:3000'
     SESSION = None
+    LIST_TYPES = ('task', 'project', 'context')
+    RECUR_INFO = {"DoNotRepeat":0,
+                  "EveryDay" : 1,
+                  "EveryWeekday" : 2,
+                  "EveryWeek" : 3,
+                  "Every2Weeks" : 4,
+                  "EveryMonth" : 5,
+                  "EveryHalfYear" : 6,
+                  "EveryYear" : 7,
+                  "Every3Weeks" : 8,
+                  "Every2Months" : 9,
+                  "Every3Months" : 10,
+                  "Every2Years" : 11,
+                  "Every2days" : 12,
+                  "Every4Weeks" : 13,
+                  }
 
     def __init__(self):
         if self.SESSION is None:
@@ -58,3 +77,67 @@ class Nozbe(object):
             self._decode_oauth_token_from_url(r.request.url)
             return True
         return False
+
+    def _get_authorization_header(self):
+        return {"Authorization" : self.OAUTH_ACCESS_TOKEN }
+
+    def _get_items(self, item_type):
+        if not item_type in self.LIST_TYPES:
+            return None
+        url = f"{self.API_URL}{'/list'}"
+        headers = self._get_authorization_header()
+        params = dict()
+        params['type'] = item_type
+        r = self.SESSION.get(url, headers=headers, params=params)
+        if r.status_code == 200:
+            tasks = r.json()
+            return tasks
+        return None
+
+    def _name_to_id(self, name:str):
+        return name.lower().replace(' ', '_')
+
+    def _set_project_by_json(self, name):
+        url = f"{self.API_URL}{'/json/project'}"
+        headers = self._get_authorization_header()
+        project = dict()
+        project['name'] = name
+
+        r = self.SESSION.post(url, headers=headers, data=json.dumps([project]))
+        if r.status_code == 200:
+            response = r.json()
+            ids= {val['name']:val['id'] for id,val in response.items()}
+            return ids[name]
+        return None
+
+    def _set_task_by_json(self, name, project_id=None, date_time:datetime=None, recur:int=None):
+        url = f"{self.API_URL}{'/json/task'}"
+        headers = self._get_authorization_header()
+        data = dict()
+        data['name'] = name
+        if project_id:
+            data['project_id']=project_id
+        if date_time:
+            data['datetime'] = f"{date_time.year}-{date_time.month}-{date_time.day} {date_time.hour}:{date_time.minute}:{date_time.second}"
+        if recur:
+            data['recur'] = recur
+        r = self.SESSION.post(url, headers=headers, data=json.dumps([data]))
+        if r.status_code == 200:
+            response = r.json()
+            return response
+        return None
+
+    def create_project(self, name):
+        return self._set_project_by_json(name)
+
+    def create_task(self, name, project_id=None, date_time:datetime=None, recur:int=None):
+        return self._set_task_by_json(name,project_id, date_time, recur)
+
+
+    def test(self):
+        project_id = self.create_project('first_project')
+        self.create_task('task', project_id)
+        print(project_id)
+        pprint(self._get_items('task'))
+        pprint(self._get_items('project'))
+        pprint(self._get_items('context'))
