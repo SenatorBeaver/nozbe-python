@@ -106,7 +106,7 @@ class Nozbe(object):
         r = self.SESSION.post(url, headers=headers, data=json.dumps([project]))
         if r.status_code == 200:
             response = r.json()
-            ids= {val['name']:val['id'] for id,val in response.items()}
+            ids= {val['name']:val['id'] for id,val in response.items() if 'name' in val}
             return ids[name]
         return None
 
@@ -118,9 +118,10 @@ class Nozbe(object):
         if project_id:
             data['project_id']=project_id
         if date_time:
-            data['datetime'] = f"{date_time.year}-{date_time.month}-{date_time.day} {date_time.hour}:{date_time.minute}:{date_time.second}"
+            data['datetime'] = date_time.strftime("%Y-%m-%d %H:%M:%S")
         if recur:
             data['recur'] = recur
+        log.debug(f"Request url: {url}, \n  headers:{headers},\n  data:{data}")
         r = self.SESSION.post(url, headers=headers, data=json.dumps([data]))
         if r.status_code == 200:
             response = r.json()
